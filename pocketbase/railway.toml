@@ -1,6 +1,6 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "Dockerfile"
+dockerfilePath = "/pocketbase/Dockerfile"
 
 [deploy]
 startCommand = "DOCKER"
