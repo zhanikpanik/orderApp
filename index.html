@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Meal Planner</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .day-section {
+            background: white;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .day-header {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        .meal-options {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        .meal-option {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .meal-option:hover {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+        .meal-option.selected {
+            background: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        .meal-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .meal-description {
+            font-size: 0.9em;
+            color: #666;
+        }
+        .meal-option.selected .meal-description {
+            color: rgba(255,255,255,0.8);
+        }
+        .submit-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            font-size: 1.1em;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+        .submit-btn:hover {
+            background: #218838;
+        }
+        .submit-btn:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .error {
+            color: #dc3545;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div id="loading" class="loading">Loading meals...</div>
+        <div id="error" class="error" style="display: none;"></div>
+        <div id="meal-planner" style="display: none;">
+            <div class="day-section">
+                <div class="day-header">Monday</div>
+                <div class="meal-options" id="monday-meals"></div>
+            </div>
+            <div class="day-section">
+                <div class="day-header">Tuesday</div>
+                <div class="meal-options" id="tuesday-meals"></div>
+            </div>
+            <div class="day-section">
+                <div class="day-header">Wednesday</div>
+                <div class="meal-options" id="wednesday-meals"></div>
+            </div>
+            <div class="day-section">
+                <div class="day-header">Thursday</div>
+                <div class="meal-options" id="thursday-meals"></div>
+            </div>
+            <div class="day-section">
+                <div class="day-header">Friday</div>
+                <div class="meal-options" id="friday-meals"></div>
+            </div>
+            <button id="submit" class="submit-btn" disabled>Submit Meal Plan</button>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Telegram Web App
+        const webApp = window.Telegram.WebApp;
+        webApp.ready();
+        webApp.expand();
+
+        // Store selected meals
+        const selectedMeals = {
+            monday: null,
+            tuesday: null,
+            wednesday: null,
+            thursday: null,
+            friday: null
+        };
+
+        // Fetch meals from PocketBase
+        async function fetchMeals() {
+            try {
+                const response = await fetch('/api/menu');
+                if (!response.ok) {
+                    throw new Error('Failed to fetch meals');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error('Error fetching meals:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to load meals. Please try again later.';
+                return [];
+            }
+        }
+
+        // Create meal option element
+        function createMealOption(meal) {
+            const div = document.createElement('div');
+            div.className = 'meal-option';
+            div.innerHTML = `
+                <div class="meal-name">${meal.name}</div>
+                <div class="meal-description">${meal.description}</div>
+            `;
+            return div;
+        }
+
+        // Render meals for a day
+        function renderMeals(day, meals) {
+            const container = document.getElementById(`${day}-meals`);
+            container.innerHTML = '';
+            meals.forEach(meal => {
+                const option = createMealOption(meal);
+                option.addEventListener('click', () => {
+                    // Remove selected class from all options
+                    container.querySelectorAll('.meal-option').forEach(opt => {
+                        opt.classList.remove('selected');
+                    });
+                    // Add selected class to clicked option
+                    option.classList.add('selected');
+                    // Store selection
+                    selectedMeals[day] = meal.name;
+                    // Enable submit button if all days have selections
+                    updateSubmitButton();
+                });
+                container.appendChild(option);
+            });
+        }
+
+        // Update submit button state
+        function updateSubmitButton() {
+            const submitBtn = document.getElementById('submit');
+            const allSelected = Object.values(selectedMeals).every(meal => meal !== null);
+            submitBtn.disabled = !allSelected;
+        }
+
+        // Initialize the app
+        async function init() {
+            const meals = await fetchMeals();
+            if (meals.length > 0) {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('meal-planner').style.display = 'block';
+                
+                // Render meals for each day
+                ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+                    renderMeals(day, meals);
+                });
+
+                // Handle submit
+                document.getElementById('submit').addEventListener('click', () => {
+                    webApp.sendData(JSON.stringify(selectedMeals));
+                    webApp.close();
+                });
+            }
+        }
+
+        // Start the app
+        init();
+    </script>
+</body>
+</html> 
