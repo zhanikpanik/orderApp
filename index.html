@@ -129,6 +129,10 @@
         webApp.ready();
         webApp.expand();
 
+        // Настройка MainButton
+        webApp.MainButton.text = "Submit Order";
+        webApp.MainButton.color = "#28a745";
+
         // Store selected meals
         const selectedMeals = {
             monday: null,
@@ -216,40 +220,38 @@
                         submitBtn.disabled = true;
                         submitBtn.textContent = 'Saving...';
 
-                        // First try to save via API
-                        try {
-                            const response = await fetch('/api/submit-order', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json'
-                                },
-                                body: JSON.stringify(selectedMeals)
-                            });
+                        // First save via API
+                        const response = await fetch('/api/submit-order', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify(selectedMeals)
+                        });
 
-                            if (!response.ok) {
-                                throw new Error('Failed to save order');
-                            }
-                        } catch (error) {
-                            console.error('API save failed, falling back to Telegram:', error);
+                        if (!response.ok) {
+                            throw new Error('Failed to save order');
                         }
 
-                        // Then try to send to Telegram
-                        try {
-                            webApp.sendData(JSON.stringify(selectedMeals));
-                            // If we get here, we're probably on mobile and the app will close automatically
-                        } catch (error) {
-                            console.error('Telegram send failed:', error);
-                            // If both methods fail, show error
-                            if (!response.ok) {
-                                throw new Error('Failed to submit order');
+                        // After successful API save, try to notify Telegram
+                        // Use a timeout to ensure API call is complete
+                        setTimeout(() => {
+                            try {
+                                webApp.MainButton.text = "Order Submitted!";
+                                webApp.MainButton.show();
+                                webApp.sendData(JSON.stringify(selectedMeals));
+                            } catch (e) {
+                                console.log('Telegram notification failed, but order was saved:', e);
+                            } finally {
+                                // Give user feedback before closing
+                                setTimeout(() => {
+                                    webApp.close();
+                                }, 1000);
                             }
-                        }
+                        }, 500);
 
-                        // If we get here on desktop, manually close the app
-                        webApp.close();
                     } catch (error) {
                         console.error('Error submitting order:', error);
-                        const submitBtn = document.getElementById('submit');
                         submitBtn.textContent = 'Error! Try Again';
                         setTimeout(() => {
                             submitBtn.disabled = false;
