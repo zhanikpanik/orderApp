@@ -1,18 +1,21 @@
 {
   "name": "zaebis_food",
   "version": "1.0.0",
-  "description": "Telegram Web App for meal planning",
+  "description": "Telegram bot for meal planning",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
-    "dev": "ngrok http 3000"
+    "dev": "nodemon bot.js"
   },
   "dependencies": {
-    "telegraf": "^4.15.3",
     "express": "^4.18.2",
+    "telegraf": "^4.15.3",
     "pocketbase": "^0.21.1"
   },
   "devDependencies": {
-    "ngrok": "^4.3.1"
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=16.0.0"
   }
 } 

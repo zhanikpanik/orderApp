@@ -1,8 +1,0 @@
-# This is for the main bot service
-[build]
-builder = "NIXPACKS"
-
-[deploy]
-startCommand = "npm start"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10 
