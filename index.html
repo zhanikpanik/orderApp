@@ -201,64 +201,72 @@
 
         // Initialize the app
         async function init() {
-            const meals = await fetchMeals();
-            if (meals.length > 0) {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('meal-planner').style.display = 'block';
-                
-                // Render meals for each day
-                ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
-                    renderMeals(day, meals);
-                });
+            try {
+                const meals = await fetchMeals();
+                if (meals.length > 0) {
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('meal-planner').style.display = 'block';
+                    
+                    // Render meals for each day
+                    ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'].forEach(day => {
+                        renderMeals(day, meals);
+                    });
 
-                // Handle submit
-                document.getElementById('submit').addEventListener('click', async () => {
-                    try {
-                        // Show loading state
-                        const submitBtn = document.getElementById('submit');
-                        const originalText = submitBtn.textContent;
-                        submitBtn.disabled = true;
-                        submitBtn.textContent = 'Saving...';
+                    // Handle submit
+                    document.getElementById('submit').addEventListener('click', async () => {
+                        try {
+                            // Show loading state
+                            const submitBtn = document.getElementById('submit');
+                            const originalText = submitBtn.textContent;
+                            submitBtn.disabled = true;
+                            submitBtn.textContent = 'Saving...';
 
-                        // First save via API
-                        const response = await fetch('/api/submit-order', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify(selectedMeals)
-                        });
+                            // First save via API
+                            const response = await fetch('/api/submit-order', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(selectedMeals)
+                            });
 
-                        if (!response.ok) {
-                            throw new Error('Failed to save order');
-                        }
-
-                        // After successful API save, try to notify Telegram
-                        // Use a timeout to ensure API call is complete
-                        setTimeout(() => {
-                            try {
-                                webApp.MainButton.text = "Order Submitted!";
-                                webApp.MainButton.show();
-                                webApp.sendData(JSON.stringify(selectedMeals));
-                            } catch (e) {
-                                console.log('Telegram notification failed, but order was saved:', e);
-                            } finally {
-                                // Give user feedback before closing
-                                setTimeout(() => {
-                                    webApp.close();
-                                }, 1000);
+                            if (!response.ok) {
+                                throw new Error('Failed to save order');
                             }
-                        }, 500);
 
-                    } catch (error) {
-                        console.error('Error submitting order:', error);
-                        submitBtn.textContent = 'Error! Try Again';
-                        setTimeout(() => {
-                            submitBtn.disabled = false;
-                            submitBtn.textContent = originalText;
-                        }, 2000);
-                    }
-                });
+                            // After successful API save, try to notify Telegram
+                            // Use a timeout to ensure API call is complete
+                            setTimeout(() => {
+                                try {
+                                    // Try to send to Telegram
+                                    webApp.sendData(JSON.stringify(selectedMeals));
+                                    // If we get here, we're probably on mobile
+                                    // The app will close automatically
+                                } catch (error) {
+                                    console.error('Telegram send failed:', error);
+                                    // If Telegram send fails but API save worked,
+                                    // we can still close the app
+                                    webApp.close();
+                                }
+                            }, 500);
+
+                        } catch (error) {
+                            console.error('Error submitting order:', error);
+                            submitBtn.textContent = 'Error! Try Again';
+                            setTimeout(() => {
+                                submitBtn.disabled = false;
+                                submitBtn.textContent = originalText;
+                            }, 2000);
+                        }
+                    });
+                } else {
+                    throw new Error('No meals available');
+                }
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                document.getElementById('error').textContent = 'Failed to load meals. Please try again later.';
             }
         }
 

@@ -4,18 +4,28 @@ const path = require('path');
 const PocketBase = require('pocketbase/cjs');
 
 // Configuration
-const BOT_TOKEN = process.env.BOT_TOKEN || '7544019946:AAE2JRLJglCK6WVuYosONGCzhxYD1TDL_tE';
-const POCKETBASE_URL = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const POCKETBASE_URL = process.env.POCKETBASE_URL;
+const WEBAPP_URL = process.env.WEBAPP_URL;
 const PORT = process.env.PORT || 3002;
 
-// For initial deployment, we'll use a temporary URL
-// This should be replaced with the actual Railway URL after first deploy
-const WEBAPP_URL = process.env.WEBAPP_URL || 'https://temp-url.railway.app';
+// Validate required environment variables
+if (!BOT_TOKEN || !POCKETBASE_URL || !WEBAPP_URL) {
+    console.error('Error: Required environment variables are missing');
+    console.error('Make sure BOT_TOKEN, POCKETBASE_URL, and WEBAPP_URL are set');
+    process.exit(1);
+}
+
+// Validate WEBAPP_URL
+if (!WEBAPP_URL.startsWith('https://')) {
+    console.error('Error: WEBAPP_URL must start with https://');
+    console.error('Current WEBAPP_URL:', WEBAPP_URL);
+    process.exit(1);
+}
 
 console.log('Starting bot with configuration:');
 console.log('POCKETBASE_URL:', POCKETBASE_URL);
 console.log('WEBAPP_URL:', WEBAPP_URL);
-console.log('Note: If using temporary URL, please update WEBAPP_URL in Railway variables after deployment');
 
 // Initialize bot
 const bot = new Telegraf(BOT_TOKEN);
@@ -29,9 +39,13 @@ const app = express();
 // Add JSON parsing middleware
 app.use(express.json());
 
-// Serve static files FROM THE ROOT DIRECTORY
-// This line tells Express to look for index.html in the same folder as bot.js
+// Serve static files
 app.use(express.static(path.join(__dirname)));
+
+// Explicitly handle the root path
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, 'index.html'));
+});
 
 // Add basic health check endpoint
 app.get('/health', (req, res) => {
@@ -74,11 +88,6 @@ app.post('/api/submit-order', async (req, res) => {
     }
 });
 
-// Explicitly handle the root path to be sure
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // Start command
 bot.command('start', async (ctx) => {
     try {
@@ -89,9 +98,7 @@ bot.command('start', async (ctx) => {
                     { 
                         text: 'Open Meal Planner', 
                         web_app: { 
-                            url: WEBAPP_URL,
-                            mode: 'fullscreen',
-                            expand: true
+                            url: WEBAPP_URL
                         } 
                     }
                 ]]
