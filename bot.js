@@ -4,21 +4,18 @@ const path = require('path');
 const PocketBase = require('pocketbase/cjs');
 
 // Configuration
-const BOT_TOKEN = '7544019946:AAE2JRLJglCK6WVuYosONGCzhxYD1TDL_tE';
-const POCKETBASE_URL = 'http://127.0.0.1:8090';
-const WEBAPP_URL = process.env.WEBAPP_URL || 'http://localhost:3002';
+const BOT_TOKEN = process.env.BOT_TOKEN || '7544019946:AAE2JRLJglCK6WVuYosONGCzhxYD1TDL_tE';
+const POCKETBASE_URL = process.env.POCKETBASE_URL || 'http://127.0.0.1:8090';
 const PORT = process.env.PORT || 3002;
 
-// Validate WEBAPP_URL
-if (!WEBAPP_URL.startsWith('https://')) {
-    console.error('Warning: WEBAPP_URL must start with https:// for Telegram Web App');
-    console.error('Please set WEBAPP_URL to your ngrok HTTPS URL');
-    process.exit(1);
-}
+// For initial deployment, we'll use a temporary URL
+// This should be replaced with the actual Railway URL after first deploy
+const WEBAPP_URL = process.env.WEBAPP_URL || 'https://temp-url.railway.app';
 
 console.log('Starting bot with configuration:');
 console.log('POCKETBASE_URL:', POCKETBASE_URL);
 console.log('WEBAPP_URL:', WEBAPP_URL);
+console.log('Note: If using temporary URL, please update WEBAPP_URL in Railway variables after deployment');
 
 // Initialize bot
 const bot = new Telegraf(BOT_TOKEN);
@@ -28,6 +25,9 @@ const pb = new PocketBase(POCKETBASE_URL);
 
 // Initialize express app
 const app = express();
+
+// Add JSON parsing middleware
+app.use(express.json());
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
@@ -48,6 +48,28 @@ app.get('/api/menu', async (req, res) => {
     } catch (error) {
         console.error('Error fetching menu:', error);
         res.status(500).json({ error: 'Failed to fetch menu' });
+    }
+});
+
+// Add order submission endpoint
+app.post('/api/submit-order', async (req, res) => {
+    try {
+        console.log('\n=== Received new order submission ===');
+        console.log('Order data:', req.body);
+
+        // Create a new order record in PocketBase
+        const orderData = {
+            meals: req.body,
+            created: new Date().toISOString()
+        };
+
+        const record = await pb.collection('orders').create(orderData);
+        console.log('Successfully saved order to PocketBase. Record ID:', record.id);
+        
+        res.json({ success: true, orderId: record.id });
+    } catch (error) {
+        console.error('Error saving order:', error);
+        res.status(500).json({ error: 'Failed to save order' });
     }
 });
 
@@ -155,8 +177,7 @@ bot.launch();
 const server = app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
     console.log(`Web App URL: ${WEBAPP_URL}`);
-    console.log('Make sure this URL starts with https://');
-    console.log('Health check available at:', `${WEBAPP_URL}/health`);
+    console.log('Make sure to update WEBAPP_URL in Railway variables after first deploy');
 });
 
 // Handle server errors
