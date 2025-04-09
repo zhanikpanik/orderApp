@@ -29,7 +29,8 @@ const app = express();
 // Add JSON parsing middleware
 app.use(express.json());
 
-// Serve static files
+// Serve static files FROM THE ROOT DIRECTORY
+// This line tells Express to look for index.html in the same folder as bot.js
 app.use(express.static(path.join(__dirname)));
 
 // Add basic health check endpoint
@@ -71,6 +72,11 @@ app.post('/api/submit-order', async (req, res) => {
         console.error('Error saving order:', error);
         res.status(500).json({ error: 'Failed to save order' });
     }
+});
+
+// Explicitly handle the root path to be sure
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Start command
