@@ -1,7 +1,8 @@
 [build]
-builder = "NIXPACKS"
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
 
 [deploy]
-startCommand = "npm start"
+startCommand = "/pb/pocketbase serve --http=0.0.0.0:8090"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10 

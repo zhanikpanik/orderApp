@@ -1,31 +1,21 @@
 FROM alpine:latest
 
-# Create a non-root user
-RUN addgroup -S pocketbase && adduser -S pocketbase -G pocketbase
+ARG PB_VERSION=0.22.3
 
-# Create and set working directory
-WORKDIR /pb
+RUN apk add --no-cache \
+    unzip \
+    ca-certificates
 
-# Create data directory with proper permissions
-RUN mkdir -p /pb/pb_data && \
-    chown -R pocketbase:pocketbase /pb
-
-# Download PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v0.21.1/pocketbase_0.21.1_linux_amd64.zip /pb/
-
-# Install required packages
-RUN apk add --no-cache unzip ca-certificates
-
-# Unzip and setup
-RUN unzip pocketbase_0.21.1_linux_amd64.zip && \
-    rm pocketbase_0.21.1_linux_amd64.zip && \
-    chmod +x /pb/pocketbase && \
-    chown -R pocketbase:pocketbase /pb
-
-# Switch to non-root user
-USER pocketbase
+# download and unzip PocketBase
+ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
+RUN unzip /tmp/pb.zip -d /pb/ && \
+    rm /tmp/pb.zip && \
+    chmod +x /pb/pocketbase
 
 EXPOSE 8090
 
-# Start PocketBase with verbose logging
-CMD ["./pocketbase", "serve", "--http=0.0.0.0:8090", "--debug"] 
+# Set default command that can be overridden
+ENV START_COMMAND="/pb/pocketbase serve --http=0.0.0.0:8090"
+
+# Use shell form to allow environment variable expansion
+CMD $START_COMMAND 
