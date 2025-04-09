@@ -208,9 +208,54 @@
                 });
 
                 // Handle submit
-                document.getElementById('submit').addEventListener('click', () => {
-                    webApp.sendData(JSON.stringify(selectedMeals));
-                    webApp.close();
+                document.getElementById('submit').addEventListener('click', async () => {
+                    try {
+                        // Show loading state
+                        const submitBtn = document.getElementById('submit');
+                        const originalText = submitBtn.textContent;
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = 'Saving...';
+
+                        // First try to save via API
+                        try {
+                            const response = await fetch('/api/submit-order', {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify(selectedMeals)
+                            });
+
+                            if (!response.ok) {
+                                throw new Error('Failed to save order');
+                            }
+                        } catch (error) {
+                            console.error('API save failed, falling back to Telegram:', error);
+                        }
+
+                        // Then try to send to Telegram
+                        try {
+                            webApp.sendData(JSON.stringify(selectedMeals));
+                            // If we get here, we're probably on mobile and the app will close automatically
+                        } catch (error) {
+                            console.error('Telegram send failed:', error);
+                            // If both methods fail, show error
+                            if (!response.ok) {
+                                throw new Error('Failed to submit order');
+                            }
+                        }
+
+                        // If we get here on desktop, manually close the app
+                        webApp.close();
+                    } catch (error) {
+                        console.error('Error submitting order:', error);
+                        const submitBtn = document.getElementById('submit');
+                        submitBtn.textContent = 'Error! Try Again';
+                        setTimeout(() => {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = originalText;
+                        }, 2000);
+                    }
                 });
             }
         }
