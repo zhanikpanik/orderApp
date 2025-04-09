@@ -12,10 +12,11 @@ RUN unzip /tmp/pb.zip -d /pb/ && \
     rm /tmp/pb.zip && \
     chmod +x /pb/pocketbase
 
-EXPOSE 8090
+# Default port if not set in environment
+ENV PORT=8090
 
 # Set default command that can be overridden
-ENV START_COMMAND="/pb/pocketbase serve --http=0.0.0.0:8090"
+ENV START_COMMAND="/pb/pocketbase serve --http=0.0.0.0:${PORT}"
 
 # Use shell form to allow environment variable expansion
 CMD $START_COMMAND 
