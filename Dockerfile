@@ -27,14 +27,17 @@ RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSIO
     && rm pocketbase_${PB_VERSION}_linux_amd64.zip \
     && chmod +x /pb/pocketbase
 
-# Create directory for supervisord config
-RUN mkdir -p /etc/supervisor/conf.d
+# Create directory for supervisord config and logs
+RUN mkdir -p /etc/supervisor/conf.d /var/log/supervisor
 
-# Create supervisord config
+# Copy supervisord config
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+# Create volume for PocketBase data
+VOLUME ["/pb/pb_data"]
 
 # Expose ports
 EXPOSE 8080 8090
 
-# Start supervisord
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 
+# Start supervisord with proper logging
+CMD ["/usr/bin/supervisord", "-n", "-c", "/etc/supervisor/conf.d/supervisord.conf"] 
