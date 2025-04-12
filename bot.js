@@ -16,10 +16,16 @@ if (!BOT_TOKEN || !POCKETBASE_URL || !WEBAPP_URL) {
     process.exit(1);
 }
 
-// Validate WEBAPP_URL
+// Validate WEBAPP_URL and POCKETBASE_URL
 if (!WEBAPP_URL.startsWith('https://')) {
     console.error('Error: WEBAPP_URL must start with https://');
     console.error('Current WEBAPP_URL:', WEBAPP_URL);
+    process.exit(1);
+}
+
+if (!POCKETBASE_URL.startsWith('https://')) {
+    console.error('Error: POCKETBASE_URL must start with https://');
+    console.error('Current POCKETBASE_URL:', POCKETBASE_URL);
     process.exit(1);
 }
 
@@ -27,10 +33,8 @@ console.log('Starting bot with configuration:');
 console.log('POCKETBASE_URL:', POCKETBASE_URL);
 console.log('WEBAPP_URL:', WEBAPP_URL);
 
-// Initialize bot
+// Initialize bot and PocketBase
 const bot = new Telegraf(BOT_TOKEN);
-
-// Initialize PocketBase
 const pb = new PocketBase(POCKETBASE_URL);
 
 // Function to test PocketBase connection
@@ -54,9 +58,18 @@ async function waitForPocketBase(retries = 5, delay = 2000) {
 // Start everything
 async function startApp() {
     try {
+        // Test PocketBase connection first
         await waitForPocketBase();
+        
+        // Start the bot
         await bot.launch();
         console.log('Bot started successfully');
+        
+        // Start the express server
+        app.listen(PORT, () => {
+            console.log(`Server is running on port ${PORT}`);
+            console.log(`Web App URL: ${WEBAPP_URL}`);
+        });
     } catch (error) {
         console.error('Failed to start application:', error);
         process.exit(1);
@@ -213,45 +226,16 @@ bot.on('web_app_data', async (ctx) => {
     }
 });
 
-// Graceful shutdown
+// Start the application
+startApp();
+
+// Enable graceful stop
 process.once('SIGINT', () => {
     console.log('SIGINT received, stopping bot...');
     bot.stop('SIGINT');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
 });
 
 process.once('SIGTERM', () => {
     console.log('SIGTERM received, stopping bot...');
     bot.stop('SIGTERM');
-    server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
-    });
-});
-
-// Replace bot.launch() and server.listen() with startApp()
-startApp();
-
-// Create server with port reuse
-const server = app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-    console.log(`Web App URL: ${WEBAPP_URL}`);
-    console.log('Make sure to update WEBAPP_URL in Railway variables after first deploy');
-});
-
-// Handle server errors
-server.on('error', (error) => {
-    if (error.code === 'EADDRINUSE') {
-        console.log(`Port ${PORT} is in use, trying to close existing connection...`);
-        // Try to close the server and restart
-        server.close(() => {
-            console.log('Server closed, restarting...');
-            server.listen(PORT);
-        });
-    } else {
-        console.error('Server error:', error);
-    }
 }); 
