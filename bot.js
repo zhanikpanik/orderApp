@@ -42,30 +42,21 @@ async function waitForPocketBase(retries = 5, delay = 2000) {
             console.log('PocketBase connection successful!');
             return true;
         } catch (error) {
-            console.error(`PocketBase connection failed (attempt ${i + 1}/${retries}):`, error);
+            console.error(`Connection attempt ${i + 1} failed:`, error.message);
             if (i < retries - 1) {
-                console.log(`Waiting ${delay/1000} seconds before next attempt...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
     }
-    throw new Error('Failed to connect to PocketBase after multiple attempts');
+    throw new Error('Failed to connect to PocketBase');
 }
 
-// Start everything only after PocketBase is ready
+// Start everything
 async function startApp() {
     try {
         await waitForPocketBase();
-        
-        // Start the bot
         await bot.launch();
         console.log('Bot started successfully');
-
-        // Start the server
-        server.listen(PORT, () => {
-            console.log(`Server is running on port ${PORT}`);
-            console.log(`Web App URL: ${WEBAPP_URL}`);
-        });
     } catch (error) {
         console.error('Failed to start application:', error);
         process.exit(1);

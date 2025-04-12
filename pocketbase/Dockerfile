@@ -6,17 +6,11 @@ RUN apk add --no-cache \
     unzip \
     ca-certificates
 
-# download and unzip PocketBase
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/ && \
-    rm /tmp/pb.zip && \
-    chmod +x /pb/pocketbase
+RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip \
+    && unzip pocketbase_${PB_VERSION}_linux_amd64.zip -d /pb/ \
+    && rm pocketbase_${PB_VERSION}_linux_amd64.zip \
+    && chmod +x /pb/pocketbase
 
-# Default port if not set in environment
-ENV PORT=8090
+EXPOSE 8090
 
-# Set default command that can be overridden
-ENV START_COMMAND="/pb/pocketbase serve --http=0.0.0.0:${PORT}"
-
-# Use shell form to allow environment variable expansion
-CMD $START_COMMAND 
+CMD ["/pb/pocketbase", "serve", "--http=0.0.0.0:8090"] 
