@@ -33,6 +33,14 @@ const bot = new Telegraf(BOT_TOKEN);
 // Initialize PocketBase
 const pb = new PocketBase(POCKETBASE_URL);
 
+// Test PocketBase connection
+console.log('Testing PocketBase connection...');
+pb.health.check().then(() => {
+    console.log('PocketBase connection successful');
+}).catch(error => {
+    console.error('PocketBase connection failed:', error);
+});
+
 // Initialize express app
 const app = express();
 
@@ -183,8 +191,30 @@ bot.on('web_app_data', async (ctx) => {
     }
 });
 
+// Graceful shutdown
+process.once('SIGINT', () => {
+    console.log('SIGINT received, stopping bot...');
+    bot.stop('SIGINT');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+process.once('SIGTERM', () => {
+    console.log('SIGTERM received, stopping bot...');
+    bot.stop('SIGTERM');
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
 // Start the bot
-bot.launch();
+bot.launch().catch(error => {
+    console.error('Error launching bot:', error);
+    process.exit(1);
+});
 
 // Create server with port reuse
 const server = app.listen(PORT, () => {
@@ -205,21 +235,4 @@ server.on('error', (error) => {
     } else {
         console.error('Server error:', error);
     }
-});
-
-// Enable graceful stop
-process.once('SIGINT', () => {
-    console.log('Shutting down gracefully...');
-    server.close(() => {
-        console.log('Server closed');
-        bot.stop('SIGINT');
-    });
-});
-
-process.once('SIGTERM', () => {
-    console.log('Shutting down gracefully...');
-    server.close(() => {
-        console.log('Server closed');
-        bot.stop('SIGTERM');
-    });
 }); 
