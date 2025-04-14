@@ -69,6 +69,9 @@ async function waitForPocketBase(retries = 5, delay = 2000) {
 
 // Start everything
 async function startApp() {
+    let server = null;
+    let botStarted = false;
+
     try {
         console.log('Starting application...');
         console.log('Environment variables:');
@@ -82,13 +85,40 @@ async function startApp() {
         // Test PocketBase connection first
         await waitForPocketBase();
         
-        // Start the bot
-        await bot.launch();
-        console.log('Bot started successfully');
+        // Start the bot with webhook mode
+        await bot.launch({
+            webhook: {
+                domain: process.env.WEBAPP_URL,
+                port: process.env.PORT
+            }
+        });
+        botStarted = true;
+        console.log('Bot started successfully in webhook mode');
+
+        // Handle shutdown signals
+        const shutdown = async (signal) => {
+            console.log(`${signal} received. Shutting down gracefully...`);
+            if (botStarted) {
+                console.log('Stopping bot...');
+                await bot.stop(signal);
+            }
+            if (server) {
+                console.log('Closing server...');
+                server.close(() => {
+                    console.log('Server closed');
+                    process.exit(0);
+                });
+            } else {
+                process.exit(0);
+            }
+        };
+
+        process.once('SIGINT', () => shutdown('SIGINT'));
+        process.once('SIGTERM', () => shutdown('SIGTERM'));
 
         return new Promise((resolve, reject) => {
             // Start the express server
-            const server = app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+            server = app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
                 const addr = server.address();
                 console.log('\n=== Web Server Configuration ===');
                 console.log('Server address:', addr);
@@ -110,35 +140,13 @@ async function startApp() {
                     process.exit(1);
                 }
             });
-
-            // Handle uncaught exceptions
-            process.on('uncaughtException', (err) => {
-                console.error('Uncaught exception:', err);
-                server.close(() => {
-                    process.exit(1);
-                });
-            });
-
-            // Handle unhandled rejections
-            process.on('unhandledRejection', (err) => {
-                console.error('Unhandled rejection:', err);
-                server.close(() => {
-                    process.exit(1);
-                });
-            });
-
-            // Handle process termination
-            process.on('SIGTERM', () => {
-                console.log('SIGTERM received. Shutting down gracefully...');
-                server.close(() => {
-                    console.log('Server closed');
-                    process.exit(0);
-                });
-            });
         });
     } catch (error) {
         console.error('Failed to start application:', error);
         console.error('Stack trace:', error.stack);
+        if (botStarted) {
+            await bot.stop();
+        }
         process.exit(1);
     }
 }
@@ -367,15 +375,4 @@ bot.on('web_app_data', async (ctx) => {
 startApp().catch(error => {
     console.error('Failed to start application:', error);
     process.exit(1);
-});
-
-// Enable graceful stop
-process.once('SIGINT', () => {
-    console.log('SIGINT received, stopping bot...');
-    bot.stop('SIGINT');
-});
-
-process.once('SIGTERM', () => {
-    console.log('SIGTERM received, stopping bot...');
-    bot.stop('SIGTERM');
 }); 
