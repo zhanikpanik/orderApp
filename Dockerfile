@@ -30,7 +30,7 @@ PB_PID=$!\n\
 echo "Waiting for PocketBase to be ready..."\n\
 timeout=30\n\
 while [ $timeout -gt 0 ]; do\n\
-    if curl -s http://0.0.0.0:8090/api/health > /dev/null; then\n\
+    if curl -s http://127.0.0.1:8090/api/health > /dev/null; then\n\
         echo "PocketBase is ready!"\n\
         break\n\
     fi\n\
@@ -44,6 +44,7 @@ if [ $timeout -eq 0 ]; then\n\
 fi\n\
 \n\
 echo "Starting bot..."\n\
+export POCKETBASE_URL="http://127.0.0.1:8090"\n\
 node bot.js & \n\
 BOT_PID=$!\n\
 \n\
