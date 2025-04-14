@@ -1,9 +1,25 @@
+# Dependencies
 node_modules
+
+# Logs
 npm-debug.log
-Dockerfile
-.dockerignore
+*.log
+
+# Git / Docker / Env files
 .git
 .gitignore
-README.md
 .env
-*.log 
+Dockerfile
+.dockerignore
+
+# Documentation
+README.md
+
+# PocketBase specific (Not needed for Node.js service build context)
+pocketbase/
+pb_data/
+pb_migrations/
+*.exe
+
+# Other (if you haven't deleted it)
+# supervisord.conf 

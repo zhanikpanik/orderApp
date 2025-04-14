@@ -1,7 +1,0 @@
-[build]
-builder = "dockerfile"
-dockerfilePath = "Dockerfile"
-
-[deploy]
-startCommand = "/pb/pocketbase serve --http=0.0.0.0:8090"
-restartPolicyType = "on_failure" 
