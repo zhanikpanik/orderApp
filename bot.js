@@ -23,8 +23,9 @@ if (!WEBAPP_URL.startsWith('https://')) {
     process.exit(1);
 }
 
-if (!POCKETBASE_URL.startsWith('https://')) {
-    console.error('Error: POCKETBASE_URL must start with https://');
+// Allow HTTP for local development
+if (!POCKETBASE_URL.startsWith('http://') && !POCKETBASE_URL.startsWith('https://')) {
+    console.error('Error: POCKETBASE_URL must start with http:// or https://');
     console.error('Current POCKETBASE_URL:', POCKETBASE_URL);
     process.exit(1);
 }

@@ -22,7 +22,7 @@ COPY . .
 
 # Create start script
 RUN echo '#!/bin/sh\n\
-/pb/pocketbase serve --http=127.0.0.1:8090 & \
+/pb/pocketbase serve --http=0.0.0.0:8090 & \
 sleep 5 && \
 node bot.js' > /app/start.sh && \
 chmod +x /app/start.sh
