@@ -1,11 +1,14 @@
-FROM alpine:latest
+FROM node:18-alpine
 
 ARG PB_VERSION=0.22.3
 
+# Install required packages
 RUN apk add --no-cache \
     unzip \
-    ca-certificates
+    ca-certificates \
+    wget
 
+# Download and install PocketBase
 RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip \
     && unzip pocketbase_${PB_VERSION}_linux_amd64.zip -d /pb/ \
     && rm pocketbase_${PB_VERSION}_linux_amd64.zip \
