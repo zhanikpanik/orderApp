@@ -76,6 +76,8 @@ async function startApp() {
         console.log('NODE_ENV:', process.env.NODE_ENV);
         console.log('WEBAPP_URL:', process.env.WEBAPP_URL);
         console.log('POCKETBASE_URL:', process.env.POCKETBASE_URL);
+        console.log('Current working directory:', process.cwd());
+        console.log('Files in directory:', require('fs').readdirSync(process.cwd()));
 
         // Test PocketBase connection first
         await waitForPocketBase();
@@ -83,31 +85,55 @@ async function startApp() {
         // Start the bot
         await bot.launch();
         console.log('Bot started successfully');
-        
-        // Start the express server
-        const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log('\n=== Web Server Configuration ===');
-            console.log(`Server is running on port ${PORT}`);
-            console.log(`Web App URL: ${WEBAPP_URL}`);
-            console.log(`Express server listening on 0.0.0.0:${PORT}`);
-            console.log('===============================\n');
-        });
 
-        // Add error handling for the server
-        server.on('error', (error) => {
-            console.error('Server error:', error);
-            if (error.code === 'EADDRINUSE') {
-                console.error(`Port ${PORT} is already in use`);
-                process.exit(1);
-            }
-        });
+        return new Promise((resolve, reject) => {
+            // Start the express server
+            const server = app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
+                const addr = server.address();
+                console.log('\n=== Web Server Configuration ===');
+                console.log('Server address:', addr);
+                console.log(`Server is running on port ${addr.port}`);
+                console.log(`Web App URL: ${process.env.WEBAPP_URL}`);
+                console.log(`Express server listening on ${addr.address}:${addr.port}`);
+                console.log('===============================\n');
+                resolve(server);
+            }).on('error', (err) => {
+                console.error('Failed to start server:', err);
+                reject(err);
+            });
 
-        // Handle process termination
-        process.on('SIGTERM', () => {
-            console.log('SIGTERM received. Shutting down gracefully...');
-            server.close(() => {
-                console.log('Server closed');
-                process.exit(0);
+            // Add error handling for the server
+            server.on('error', (error) => {
+                console.error('Server error:', error);
+                if (error.code === 'EADDRINUSE') {
+                    console.error(`Port ${process.env.PORT} is already in use`);
+                    process.exit(1);
+                }
+            });
+
+            // Handle uncaught exceptions
+            process.on('uncaughtException', (err) => {
+                console.error('Uncaught exception:', err);
+                server.close(() => {
+                    process.exit(1);
+                });
+            });
+
+            // Handle unhandled rejections
+            process.on('unhandledRejection', (err) => {
+                console.error('Unhandled rejection:', err);
+                server.close(() => {
+                    process.exit(1);
+                });
+            });
+
+            // Handle process termination
+            process.on('SIGTERM', () => {
+                console.log('SIGTERM received. Shutting down gracefully...');
+                server.close(() => {
+                    console.log('Server closed');
+                    process.exit(0);
+                });
             });
         });
     } catch (error) {
@@ -119,6 +145,14 @@ async function startApp() {
 
 // Initialize express app
 const app = express();
+
+// Basic security middleware
+app.use((req, res, next) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    next();
+});
 
 // Add JSON parsing middleware
 app.use(express.json());
@@ -138,12 +172,18 @@ app.use((req, res, next) => {
 // Add request logging
 app.use((req, res, next) => {
     const timestamp = new Date().toISOString();
-    const { method, url, headers, body } = req;
-    console.log(`[${timestamp}] ${method} ${url}`);
-    console.log('Headers:', JSON.stringify(headers, null, 2));
-    if (Object.keys(body || {}).length > 0) {
-        console.log('Body:', JSON.stringify(body, null, 2));
-    }
+    console.log(`[${timestamp}] ${req.method} ${req.url}`);
+    console.log('Headers:', req.headers);
+    console.log('Query:', req.query);
+    console.log('Body:', req.body);
+    
+    // Log response
+    const oldSend = res.send;
+    res.send = function(data) {
+        console.log(`[${timestamp}] Response:`, data);
+        return oldSend.apply(res, arguments);
+    };
+    
     next();
 });
 
@@ -159,12 +199,17 @@ app.get('/health', (req, res) => {
     res.json({
         status: 'ok',
         timestamp: new Date().toISOString(),
-        port: PORT,
+        port: process.env.PORT,
         env: {
             NODE_ENV: process.env.NODE_ENV,
             PORT: process.env.PORT
         },
-        headers: req.headers
+        headers: req.headers,
+        server: {
+            uptime: process.uptime(),
+            memory: process.memoryUsage(),
+            pid: process.pid
+        }
     });
 });
 
@@ -183,7 +228,7 @@ app.use(express.static(path.join(__dirname), {
 
 // Explicitly handle the root path
 app.get('/', (req, res) => {
-    console.log('Serving index.html');
+    console.log('Serving index.html from:', path.join(__dirname, 'index.html'));
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
@@ -319,7 +364,10 @@ bot.on('web_app_data', async (ctx) => {
 });
 
 // Start the application
-startApp();
+startApp().catch(error => {
+    console.error('Failed to start application:', error);
+    process.exit(1);
+});
 
 // Enable graceful stop
 process.once('SIGINT', () => {
