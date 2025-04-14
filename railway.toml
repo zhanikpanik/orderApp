@@ -5,7 +5,10 @@ builder = "DOCKERFILE"
 startCommand = "npm start"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 10
+port = 3002
 
 [deploy.env]
 NODE_ENV = "production"
-POCKETBASE_URL = "http://localhost:8090" 
+PORT = "3002"
+POCKETBASE_URL = "https://pocketbase-production-040c.up.railway.app"
+WEBAPP_URL = "https://orderapp-production.up.railway.app" 
