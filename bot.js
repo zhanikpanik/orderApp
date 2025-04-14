@@ -7,7 +7,7 @@ const PocketBase = require('pocketbase/cjs');
 const BOT_TOKEN = process.env.BOT_TOKEN;
 const POCKETBASE_URL = process.env.POCKETBASE_URL;
 const WEBAPP_URL = process.env.WEBAPP_URL;
-const PORT = process.env.PORT || 3002;
+const PORT = process.env.PORT || 8080;
 
 // Validate required environment variables
 if (!BOT_TOKEN || !POCKETBASE_URL || !WEBAPP_URL) {
@@ -104,14 +104,21 @@ app.use(express.json());
 
 // Add request logging
 app.use((req, res, next) => {
-    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    const timestamp = new Date().toISOString();
+    const { method, url, headers, body } = req;
+    console.log(`[${timestamp}] ${method} ${url}`);
+    console.log('Headers:', JSON.stringify(headers, null, 2));
+    if (Object.keys(body || {}).length > 0) {
+        console.log('Body:', JSON.stringify(body, null, 2));
+    }
     next();
 });
 
 // Add error handling middleware
 app.use((err, req, res, next) => {
     console.error('Express error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error('Stack trace:', err.stack);
+    res.status(500).json({ error: 'Internal server error', details: err.message });
 });
 
 // Serve static files
@@ -122,9 +129,17 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Add basic health check endpoint
+// Add health check endpoint with detailed info
 app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+    res.json({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        port: PORT,
+        env: {
+            NODE_ENV: process.env.NODE_ENV,
+            PORT: process.env.PORT
+        }
+    });
 });
 
 // Add menu management endpoints
