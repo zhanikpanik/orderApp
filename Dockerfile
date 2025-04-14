@@ -4,7 +4,8 @@ FROM node:18-alpine
 RUN apk add --no-cache \
     unzip \
     ca-certificates \
-    wget
+    wget \
+    curl
 
 # Download and install PocketBase
 ARG PB_VERSION=0.22.3
@@ -22,9 +23,35 @@ COPY . .
 
 # Create start script
 RUN echo '#!/bin/sh\n\
+echo "Starting PocketBase..."\n\
 /pb/pocketbase serve --http=0.0.0.0:8090 & \
-sleep 5 && \
-node bot.js' > /app/start.sh && \
+PB_PID=$!\n\
+\n\
+echo "Waiting for PocketBase to be ready..."\n\
+timeout=30\n\
+while [ $timeout -gt 0 ]; do\n\
+    if curl -s http://0.0.0.0:8090/api/health > /dev/null; then\n\
+        echo "PocketBase is ready!"\n\
+        break\n\
+    fi\n\
+    sleep 1\n\
+    timeout=$((timeout-1))\n\
+done\n\
+\n\
+if [ $timeout -eq 0 ]; then\n\
+    echo "Timeout waiting for PocketBase"\n\
+    exit 1\n\
+fi\n\
+\n\
+echo "Starting bot..."\n\
+node bot.js & \n\
+BOT_PID=$!\n\
+\n\
+# Wait for any process to exit\n\
+wait -n\n\
+\n\
+# Exit with status of process that exited first\n\
+exit $?' > /app/start.sh && \
 chmod +x /app/start.sh
 
 EXPOSE 8080 8090

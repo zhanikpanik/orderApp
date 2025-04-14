@@ -43,17 +43,28 @@ async function waitForPocketBase(retries = 5, delay = 2000) {
     for (let i = 0; i < retries; i++) {
         try {
             console.log(`Attempting to connect to PocketBase (attempt ${i + 1}/${retries})...`);
-            await pb.health.check();
+            console.log('Using PocketBase URL:', POCKETBASE_URL);
+            
+            const healthCheck = await pb.health.check();
+            console.log('Health check response:', healthCheck);
             console.log('PocketBase connection successful!');
             return true;
         } catch (error) {
-            console.error(`Connection attempt ${i + 1} failed:`, error.message);
+            console.error(`Connection attempt ${i + 1} failed:`, error);
+            console.error('Full error details:', {
+                message: error.message,
+                status: error.status,
+                data: error.data,
+                url: error.url
+            });
+            
             if (i < retries - 1) {
+                console.log(`Waiting ${delay}ms before next attempt...`);
                 await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
     }
-    throw new Error('Failed to connect to PocketBase');
+    throw new Error(`Failed to connect to PocketBase at ${POCKETBASE_URL}`);
 }
 
 // Start everything
