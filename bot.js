@@ -84,22 +84,148 @@ async function startApp() {
 
         // Test PocketBase connection first
         await waitForPocketBase();
+
+        // Initialize express app
+        const app = express();
+
+        // Basic security middleware
+        app.use((req, res, next) => {
+            res.setHeader('X-Content-Type-Options', 'nosniff');
+            res.setHeader('X-Frame-Options', 'DENY');
+            res.setHeader('X-XSS-Protection', '1; mode=block');
+            next();
+        });
+
+        // Add JSON parsing middleware
+        app.use(express.json());
+        app.use(express.urlencoded({ extended: true }));
+
+        // Add CORS support
+        app.use((req, res, next) => {
+            res.header('Access-Control-Allow-Origin', '*');
+            res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+            res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+            if (req.method === 'OPTIONS') {
+                return res.sendStatus(200);
+            }
+            next();
+        });
+
+        // Add request logging
+        app.use((req, res, next) => {
+            const timestamp = new Date().toISOString();
+            console.log(`[${timestamp}] ${req.method} ${req.url}`);
+            console.log('Headers:', req.headers);
+            console.log('Query:', req.query);
+            console.log('Body:', req.body);
+            
+            // Log response
+            const oldSend = res.send;
+            res.send = function(data) {
+                console.log(`[${timestamp}] Response:`, data);
+                return oldSend.apply(res, arguments);
+            };
+            
+            next();
+        });
+
+        // Set up bot webhook
+        const secretPath = `/telegraf/${BOT_TOKEN}`;
+        app.use(bot.webhookCallback(secretPath));
         
-        // Start the bot with webhook mode
-        await bot.launch({
-            webhook: {
-                domain: process.env.WEBAPP_URL,
-                port: process.env.PORT
+        // Start the bot in webhook mode
+        const webhookUrl = `${WEBAPP_URL}${secretPath}`;
+        await bot.telegram.setWebhook(webhookUrl);
+        botStarted = true;
+        console.log('Bot webhook set to:', webhookUrl);
+
+        // Add health check endpoint with detailed info
+        app.get('/health', (req, res) => {
+            res.json({
+                status: 'ok',
+                timestamp: new Date().toISOString(),
+                port: process.env.PORT,
+                env: {
+                    NODE_ENV: process.env.NODE_ENV,
+                    PORT: process.env.PORT
+                },
+                headers: req.headers,
+                server: {
+                    uptime: process.uptime(),
+                    memory: process.memoryUsage(),
+                    pid: process.pid
+                }
+            });
+        });
+
+        // Serve static files with proper content type
+        app.use(express.static(path.join(__dirname), {
+            setHeaders: (res, path) => {
+                if (path.endsWith('.js')) {
+                    res.setHeader('Content-Type', 'application/javascript');
+                } else if (path.endsWith('.css')) {
+                    res.setHeader('Content-Type', 'text/css');
+                } else if (path.endsWith('.html')) {
+                    res.setHeader('Content-Type', 'text/html');
+                }
+            }
+        }));
+
+        // Explicitly handle the root path
+        app.get('/', (req, res) => {
+            console.log('Serving index.html from:', path.join(__dirname, 'index.html'));
+            res.sendFile(path.join(__dirname, 'index.html'));
+        });
+
+        // Add menu management endpoints
+        app.get('/api/menu', async (req, res) => {
+            try {
+                const records = await pb.collection('meals').getFullList({
+                    filter: 'active = true',
+                    sort: 'created',
+                });
+                res.json(records);
+            } catch (error) {
+                console.error('Error fetching menu:', error);
+                res.status(500).json({ error: 'Failed to fetch menu' });
             }
         });
-        botStarted = true;
-        console.log('Bot started successfully in webhook mode');
+
+        // Add order submission endpoint
+        app.post('/api/submit-order', async (req, res) => {
+            try {
+                console.log('\n=== Received new order submission ===');
+                console.log('Order data:', req.body);
+
+                // Create a new order record in PocketBase
+                const orderData = {
+                    meals: req.body,
+                    created: new Date().toISOString()
+                };
+
+                const record = await pb.collection('orders').create(orderData);
+                console.log('Successfully saved order to PocketBase. Record ID:', record.id);
+                
+                res.json({ success: true, orderId: record.id });
+            } catch (error) {
+                console.error('Error saving order:', error);
+                res.status(500).json({ error: 'Failed to save order' });
+            }
+        });
+
+        // Add error handling middleware
+        app.use((err, req, res, next) => {
+            console.error('Express error:', err);
+            console.error('Stack trace:', err.stack);
+            res.status(500).json({ error: 'Internal server error', details: err.message });
+        });
 
         // Handle shutdown signals
         const shutdown = async (signal) => {
             console.log(`${signal} received. Shutting down gracefully...`);
             if (botStarted) {
                 console.log('Stopping bot...');
+                await bot.telegram.deleteWebhook();
                 await bot.stop(signal);
             }
             if (server) {
@@ -116,15 +242,15 @@ async function startApp() {
         process.once('SIGINT', () => shutdown('SIGINT'));
         process.once('SIGTERM', () => shutdown('SIGTERM'));
 
+        // Start the server
         return new Promise((resolve, reject) => {
-            // Start the express server
             server = app.listen(process.env.PORT || 3000, '0.0.0.0', () => {
                 const addr = server.address();
                 console.log('\n=== Web Server Configuration ===');
                 console.log('Server address:', addr);
                 console.log(`Server is running on port ${addr.port}`);
-                console.log(`Web App URL: ${process.env.WEBAPP_URL}`);
-                console.log(`Express server listening on ${addr.address}:${addr.port}`);
+                console.log(`Web App URL: ${WEBAPP_URL}`);
+                console.log(`Bot webhook URL: ${webhookUrl}`);
                 console.log('===============================\n');
                 resolve(server);
             }).on('error', (err) => {
@@ -145,135 +271,17 @@ async function startApp() {
         console.error('Failed to start application:', error);
         console.error('Stack trace:', error.stack);
         if (botStarted) {
+            await bot.telegram.deleteWebhook();
             await bot.stop();
         }
         process.exit(1);
     }
 }
 
-// Initialize express app
-const app = express();
-
-// Basic security middleware
-app.use((req, res, next) => {
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    res.setHeader('X-Frame-Options', 'DENY');
-    res.setHeader('X-XSS-Protection', '1; mode=block');
-    next();
-});
-
-// Add JSON parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// Add CORS support
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', '*');
-    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-    if (req.method === 'OPTIONS') {
-        return res.sendStatus(200);
-    }
-    next();
-});
-
-// Add request logging
-app.use((req, res, next) => {
-    const timestamp = new Date().toISOString();
-    console.log(`[${timestamp}] ${req.method} ${req.url}`);
-    console.log('Headers:', req.headers);
-    console.log('Query:', req.query);
-    console.log('Body:', req.body);
-    
-    // Log response
-    const oldSend = res.send;
-    res.send = function(data) {
-        console.log(`[${timestamp}] Response:`, data);
-        return oldSend.apply(res, arguments);
-    };
-    
-    next();
-});
-
-// Add error handling middleware
-app.use((err, req, res, next) => {
-    console.error('Express error:', err);
-    console.error('Stack trace:', err.stack);
-    res.status(500).json({ error: 'Internal server error', details: err.message });
-});
-
-// Add health check endpoint with detailed info
-app.get('/health', (req, res) => {
-    res.json({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        port: process.env.PORT,
-        env: {
-            NODE_ENV: process.env.NODE_ENV,
-            PORT: process.env.PORT
-        },
-        headers: req.headers,
-        server: {
-            uptime: process.uptime(),
-            memory: process.memoryUsage(),
-            pid: process.pid
-        }
-    });
-});
-
-// Serve static files with proper content type
-app.use(express.static(path.join(__dirname), {
-    setHeaders: (res, path) => {
-        if (path.endsWith('.js')) {
-            res.setHeader('Content-Type', 'application/javascript');
-        } else if (path.endsWith('.css')) {
-            res.setHeader('Content-Type', 'text/css');
-        } else if (path.endsWith('.html')) {
-            res.setHeader('Content-Type', 'text/html');
-        }
-    }
-}));
-
-// Explicitly handle the root path
-app.get('/', (req, res) => {
-    console.log('Serving index.html from:', path.join(__dirname, 'index.html'));
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-// Add menu management endpoints
-app.get('/api/menu', async (req, res) => {
-    try {
-        const records = await pb.collection('meals').getFullList({
-            filter: 'active = true',
-            sort: 'created',
-        });
-        res.json(records);
-    } catch (error) {
-        console.error('Error fetching menu:', error);
-        res.status(500).json({ error: 'Failed to fetch menu' });
-    }
-});
-
-// Add order submission endpoint
-app.post('/api/submit-order', async (req, res) => {
-    try {
-        console.log('\n=== Received new order submission ===');
-        console.log('Order data:', req.body);
-
-        // Create a new order record in PocketBase
-        const orderData = {
-            meals: req.body,
-            created: new Date().toISOString()
-        };
-
-        const record = await pb.collection('orders').create(orderData);
-        console.log('Successfully saved order to PocketBase. Record ID:', record.id);
-        
-        res.json({ success: true, orderId: record.id });
-    } catch (error) {
-        console.error('Error saving order:', error);
-        res.status(500).json({ error: 'Failed to save order' });
-    }
+// Start the application
+startApp().catch(error => {
+    console.error('Failed to start application:', error);
+    process.exit(1);
 });
 
 // Start command
@@ -369,10 +377,4 @@ bot.on('web_app_data', async (ctx) => {
         
         await ctx.reply('Sorry, there was an error processing your meal plan. Please try again.');
     }
-});
-
-// Start the application
-startApp().catch(error => {
-    console.error('Failed to start application:', error);
-    process.exit(1);
 }); 
