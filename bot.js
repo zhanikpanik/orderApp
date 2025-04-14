@@ -70,6 +70,13 @@ async function waitForPocketBase(retries = 5, delay = 2000) {
 // Start everything
 async function startApp() {
     try {
+        console.log('Starting application...');
+        console.log('Environment variables:');
+        console.log('PORT:', process.env.PORT);
+        console.log('NODE_ENV:', process.env.NODE_ENV);
+        console.log('WEBAPP_URL:', process.env.WEBAPP_URL);
+        console.log('POCKETBASE_URL:', process.env.POCKETBASE_URL);
+
         // Test PocketBase connection first
         await waitForPocketBase();
         
@@ -79,19 +86,33 @@ async function startApp() {
         
         // Start the express server
         const server = app.listen(PORT, '0.0.0.0', () => {
-            console.log('=== Web Server Configuration ===');
+            console.log('\n=== Web Server Configuration ===');
             console.log(`Server is running on port ${PORT}`);
             console.log(`Web App URL: ${WEBAPP_URL}`);
             console.log(`Express server listening on 0.0.0.0:${PORT}`);
-            console.log('===============================');
+            console.log('===============================\n');
         });
 
         // Add error handling for the server
         server.on('error', (error) => {
             console.error('Server error:', error);
+            if (error.code === 'EADDRINUSE') {
+                console.error(`Port ${PORT} is already in use`);
+                process.exit(1);
+            }
+        });
+
+        // Handle process termination
+        process.on('SIGTERM', () => {
+            console.log('SIGTERM received. Shutting down gracefully...');
+            server.close(() => {
+                console.log('Server closed');
+                process.exit(0);
+            });
         });
     } catch (error) {
         console.error('Failed to start application:', error);
+        console.error('Stack trace:', error.stack);
         process.exit(1);
     }
 }
@@ -101,6 +122,18 @@ const app = express();
 
 // Add JSON parsing middleware
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Add CORS support
+app.use((req, res, next) => {
+    res.header('Access-Control-Allow-Origin', '*');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+    if (req.method === 'OPTIONS') {
+        return res.sendStatus(200);
+    }
+    next();
+});
 
 // Add request logging
 app.use((req, res, next) => {
@@ -121,14 +154,6 @@ app.use((err, req, res, next) => {
     res.status(500).json({ error: 'Internal server error', details: err.message });
 });
 
-// Serve static files
-app.use(express.static(path.join(__dirname)));
-
-// Explicitly handle the root path
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'index.html'));
-});
-
 // Add health check endpoint with detailed info
 app.get('/health', (req, res) => {
     res.json({
@@ -138,8 +163,28 @@ app.get('/health', (req, res) => {
         env: {
             NODE_ENV: process.env.NODE_ENV,
             PORT: process.env.PORT
-        }
+        },
+        headers: req.headers
     });
+});
+
+// Serve static files with proper content type
+app.use(express.static(path.join(__dirname), {
+    setHeaders: (res, path) => {
+        if (path.endsWith('.js')) {
+            res.setHeader('Content-Type', 'application/javascript');
+        } else if (path.endsWith('.css')) {
+            res.setHeader('Content-Type', 'text/css');
+        } else if (path.endsWith('.html')) {
+            res.setHeader('Content-Type', 'text/html');
+        }
+    }
+}));
+
+// Explicitly handle the root path
+app.get('/', (req, res) => {
+    console.log('Serving index.html');
+    res.sendFile(path.join(__dirname, 'index.html'));
 });
 
 // Add menu management endpoints
