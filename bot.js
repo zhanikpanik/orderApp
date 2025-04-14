@@ -78,9 +78,12 @@ async function startApp() {
         console.log('Bot started successfully');
         
         // Start the express server
-        app.listen(PORT, () => {
+        app.listen(PORT, '0.0.0.0', () => {
+            console.log('=== Web Server Configuration ===');
             console.log(`Server is running on port ${PORT}`);
             console.log(`Web App URL: ${WEBAPP_URL}`);
+            console.log(`Express server listening on 0.0.0.0:${PORT}`);
+            console.log('===============================');
         });
     } catch (error) {
         console.error('Failed to start application:', error);
@@ -93,6 +96,12 @@ const app = express();
 
 // Add JSON parsing middleware
 app.use(express.json());
+
+// Add request logging
+app.use((req, res, next) => {
+    console.log(`${new Date().toISOString()} - ${req.method} ${req.url}`);
+    next();
+});
 
 // Serve static files
 app.use(express.static(path.join(__dirname)));
