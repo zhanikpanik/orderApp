@@ -44,7 +44,6 @@ if [ $timeout -eq 0 ]; then\n\
 fi\n\
 \n\
 echo "Starting bot..."\n\
-export POCKETBASE_URL="http://127.0.0.1:8090"\n\
 node bot.js & \n\
 BOT_PID=$!\n\
 \n\
