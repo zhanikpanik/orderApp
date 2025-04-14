@@ -18,9 +18,14 @@ RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSIO
 
 # Set up Node.js app
 WORKDIR /app
+
+# Copy package files and install dependencies as root
+COPY package*.json ./
+RUN npm install --only=production \
+    && chown -R node:node /app
+
+# Switch to node user and copy the rest of the files
 USER node
-COPY --chown=node:node package*.json ./
-RUN npm install --only=production
 COPY --chown=node:node . .
 
 # Create start script
