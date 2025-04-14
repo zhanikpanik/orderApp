@@ -1,0 +1,14 @@
+{
+    "meta": {
+        "name": "zaebis_food"
+    },
+    "logs": {
+        "level": "DEBUG"
+    },
+    "settings": {
+        "db": {
+            "type": "postgres",
+            "url": "${DATABASE_URL}"
+        }
+    }
+} 
