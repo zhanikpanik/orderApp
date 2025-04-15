@@ -193,6 +193,128 @@
                 padding: 14px 28px;
             }
         }
+
+        /* Добавляем новые стили для экрана подтверждения */
+        .confirmation-screen {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 24px;
+            padding: 32px;
+            margin: 24px auto;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.04);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.7);
+            max-width: 800px;
+        }
+
+        .confirmation-header {
+            font-size: 32px;
+            font-weight: 600;
+            color: #1d1d1f;
+            letter-spacing: -0.003em;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+
+        .meal-summary {
+            display: grid;
+            gap: 16px;
+        }
+
+        .day-card {
+            background: linear-gradient(145deg, #ffffff, #f8f8fa);
+            border-radius: 18px;
+            padding: 24px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .day-card:hover {
+            transform: scale(1.01);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        }
+
+        .day-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1d1d1f;
+            letter-spacing: -0.022em;
+            margin-bottom: 8px;
+        }
+
+        .selected-meal {
+            font-size: 17px;
+            color: #1d1d1f;
+            letter-spacing: -0.022em;
+            line-height: 1.4;
+            padding: 12px;
+            background: rgba(0, 113, 227, 0.1);
+            border-radius: 12px;
+            margin-top: 8px;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-top: 32px;
+        }
+
+        .back-btn {
+            background: linear-gradient(145deg, #f2f2f2, #e6e6e6);
+            color: #1d1d1f;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: -0.022em;
+        }
+
+        .back-btn:hover {
+            background: linear-gradient(145deg, #e6e6e6, #f2f2f2);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        }
+
+        .confirm-btn {
+            background: linear-gradient(145deg, #0071e3, #0077ed);
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 17px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            letter-spacing: -0.022em;
+            box-shadow: 0 4px 16px rgba(0, 113, 227, 0.2);
+        }
+
+        .confirm-btn:hover {
+            background: linear-gradient(145deg, #0077ed, #0082f6);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0, 113, 227, 0.3);
+        }
+
+        @media (max-width: 480px) {
+            .confirmation-screen {
+                padding: 24px;
+                margin: 16px;
+                border-radius: 18px;
+            }
+
+            .confirmation-header {
+                font-size: 24px;
+            }
+
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 <body>
@@ -225,6 +347,18 @@
     </div>
 
     <div class="toast" id="toast"></div>
+
+    <!-- Добавляем новый экран подтверждения -->
+    <div class="confirmation-screen" id="confirmationScreen">
+        <h2 class="confirmation-header">Your Meal Plan</h2>
+        <div class="meal-summary" id="mealSummary">
+            <!-- Здесь будут динамически добавляться выбранные блюда -->
+        </div>
+        <div class="button-group">
+            <button class="back-btn" onclick="showSelectionScreen()">Edit Selection</button>
+            <button class="confirm-btn" onclick="submitOrder()">Confirm Plan</button>
+        </div>
+    </div>
 
     <script>
         // Initialize Telegram Web App
@@ -401,6 +535,49 @@
                 toast.style.display = 'none';
             }, 3000);
         }
+
+        function showConfirmationScreen() {
+            const selectionScreen = document.querySelector('.container');
+            const confirmationScreen = document.getElementById('confirmationScreen');
+            const mealSummary = document.getElementById('mealSummary');
+            
+            // Очищаем предыдущие выборы
+            mealSummary.innerHTML = '';
+            
+            // Собираем выбранные блюда
+            let hasSelection = false;
+            Object.values(selectedMeals).forEach(meal => {
+                if (meal) {
+                    hasSelection = true;
+                    const dayCard = document.createElement('div');
+                    dayCard.className = 'day-card';
+                    dayCard.innerHTML = `
+                        <div class="day-title">${meal}</div>
+                        <div class="selected-meal">${selectedMeals[meal]}</div>
+                    `;
+                    mealSummary.appendChild(dayCard);
+                }
+            });
+            
+            if (!hasSelection) {
+                showToast('Please select at least one meal', 'error');
+                return;
+            }
+            
+            selectionScreen.style.display = 'none';
+            confirmationScreen.style.display = 'block';
+        }
+
+        function showSelectionScreen() {
+            const selectionScreen = document.querySelector('.container');
+            const confirmationScreen = document.getElementById('confirmationScreen');
+            
+            confirmationScreen.style.display = 'none';
+            selectionScreen.style.display = 'block';
+        }
+
+        // Обновляем обработчик кнопки submit
+        document.getElementById('submit').onclick = showConfirmationScreen;
     </script>
 </body>
 </html> 
