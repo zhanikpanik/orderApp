@@ -4,27 +4,29 @@ FROM node:18-alpine
 RUN apk add --no-cache \
     unzip \
     ca-certificates \
-    supervisor
+    supervisor \
+    postgresql-client
 
-# Set up app directory
+# Set working directory
 WORKDIR /app
+
+# Copy package files
 COPY package*.json ./
+
+# Install dependencies
 RUN npm install
 
-# Copy app files
+# Copy application files
 COPY . .
 
-# Download and install PocketBase
+# Download and setup PocketBase
 ARG PB_VERSION=0.22.3
-ADD https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip /tmp/pb.zip
-RUN unzip /tmp/pb.zip -d /pb/ && \
-    rm /tmp/pb.zip && \
-    chmod +x /pb/pocketbase
+RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip \
+    && unzip pocketbase_${PB_VERSION}_linux_amd64.zip -d /pb/ \
+    && rm pocketbase_${PB_VERSION}_linux_amd64.zip \
+    && chmod +x /pb/pocketbase
 
-# Copy PocketBase config
-COPY pb_config.json /pb/pb_config.json
-
-# Copy supervisor configuration
+# Configure supervisor
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
 # Expose ports
