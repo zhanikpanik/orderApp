@@ -8,7 +8,7 @@
     "settings": {
         "db": {
             "type": "postgres",
-            "url": "${DATABASE_PUBLIC_URL}?sslmode=require&timezone=UTC"
+            "url": "postgresql://postgres:EjscJCNjamhWUaHYLEHggwpxPmqSjlav@postgres.railway.internal:5432/railway"
         }
     }
 } 
